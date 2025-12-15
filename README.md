@@ -1,42 +1,44 @@
 # Rate Limiter for GoFrame
 
-GoFrame 的速率限制器实现，支持基于内存和 Redis 的限速策略。
+[English](README.md) | [中文版本](README_cn.md)
 
-## 特性
+Implementation of rate limiter for GoFrame, supporting both in-memory and Redis-based rate limiting strategies.
 
-- ✅ **多种实现**: 支持内存（Memory）和 Redis 两种存储后端
-- ✅ **滑动窗口**: Redis 使用精确的滑动窗口算法
-- ✅ **并发安全**: 内存版使用 CAS 原子操作，Redis 版使用 Lua 脚本
-- ✅ **灵活配置**: 支持自定义键生成、错误处理
-- ✅ **标准化**: 符合 RFC 6585 规范的响应头
-- ✅ **高性能**: 内存版无额外开销，Redis 版原子操作
+## Features
 
-## 安装
+- ✅ **Multiple Implementations**: Supports both in-memory and Redis storage backends
+- ✅ **Sliding Window**: Redis uses precise sliding window algorithm
+- ✅ **Concurrency Safe**: In-memory version uses CAS atomic operations, Redis version uses Lua scripts
+- ✅ **Flexible Configuration**: Supports custom key generation and error handling
+- ✅ **Standardized**: Response headers compliant with RFC 6585
+- ✅ **High Performance**: No extra overhead for in-memory version, atomic operations for Redis version
+
+## Installation
 
 ```bash
 go get github.com/LanceAdd/glimiter@latest
 ```
 
-## 快速开始
+## Quick Start
 
-### 1. 基础使用
+### 1. Basic Usage
 
 ```go
 import "github.com/LanceAdd/glimiter"
 
-// 创建限速器：每分钟最多 100 次请求
+// Create limiter: up to 100 requests per minute
 limiter := glimiter.NewMemoryLimiter(100, time.Minute)
 
-// 检查是否允许请求
+// Check if request is allowed
 allowed, err := limiter.Allow(ctx, "user:123")
 if !allowed {
-    // 请求被限速
+    // Request is rate limited
 }
 ```
 
-### 2. HTTP 中间件
+### 2. HTTP Middleware
 
-#### 按 IP 限速
+#### Rate Limit by IP
 
 ```go
 s := g.Server()
@@ -49,7 +51,7 @@ s.Group("/api", func(group *ghttp.RouterGroup) {
 })
 ```
 
-#### 按 API Key 限速
+#### Rate Limit by API Key
 
 ```go
 limiter := glimiter.NewMemoryLimiter(1000, time.Hour)
@@ -61,7 +63,7 @@ s.Group("/api", func(group *ghttp.RouterGroup) {
 })
 ```
 
-#### 自定义限速逻辑
+#### Custom Rate Limit Logic
 
 ```go
 limiter := glimiter.NewMemoryLimiter(50, time.Minute)
@@ -70,7 +72,7 @@ s.Group("/api", func(group *ghttp.RouterGroup) {
     group.Middleware(glimiter.Middleware(glimiter.MiddlewareConfig{
         Limiter: limiter,
         KeyFunc: func(r *ghttp.Request) string {
-            // 自定义 key：结合 IP 和 User-Agent
+            // Custom key: combine IP and User-Agent
             return r.GetClientIp() + ":" + r.UserAgent()
         },
         ErrorHandler: func(r *ghttp.Request) {
@@ -86,7 +88,7 @@ s.Group("/api", func(group *ghttp.RouterGroup) {
 })
 ```
 
-### 3. 使用 Redis 限速器
+### 3. Using Redis Limiter
 
 ```go
 import (
@@ -94,59 +96,59 @@ import (
     "github.com/gogf/gf/v2/database/gredis"
 )
 
-// 创建 Redis 连接
+// Create Redis connection
 redis, err := gredis.New(&gredis.Config{
     Address: "127.0.0.1:6379",
 })
 
-// 创建 Redis 限速器
+// Create Redis limiter
 limiter := glimiter.NewRedisLimiter(redis, 100, time.Minute)
 
-// 使用方式与内存限速器相同
+// Usage is the same as in-memory limiter
 allowed, err := limiter.Allow(ctx, "user:123")
 ```
 
-## 核心接口
+## Core Interface
 
-### Limiter 接口
+### Limiter Interface
 
 ```go
 type Limiter interface {
-    // 检查是否允许单个请求
+    // Check if a single request is allowed
     Allow(ctx context.Context, key string) (bool, error)
     
-    // 检查是否允许 N 个请求
+    // Check if N requests are allowed
     AllowN(ctx context.Context, key string, n int) (bool, error)
     
-    // 阻塞直到允许请求
+    // Block until request is allowed
     Wait(ctx context.Context, key string) error
     
-    // 获取限制配置
+    // Get limit configuration
     GetLimit() int
     GetWindow() time.Duration
     
-    // 获取剩余配额
+    // Get remaining quota
     GetRemaining(ctx context.Context, key string) (int, error)
     
-    // 重置限制
+    // Reset limit
     Reset(ctx context.Context, key string) error
 }
 ```
 
-## 使用场景
+## Usage Scenarios
 
-### 1. 多层限速
+### 1. Multi-layer Rate Limiting
 
-针对不同时间窗口设置多层限制，防止突发流量和长期滥用：
+Set multiple layers of restrictions for different time windows to prevent burst traffic and long-term abuse:
 
 ```go
-// 第一层：防突发（每秒）
+// Layer 1: Burst protection (per second)
 burstLimiter := glimiter.NewMemoryLimiter(10, time.Second)
 
-// 第二层：常规限制（每分钟）
+// Layer 2: Normal limit (per minute)
 normalLimiter := glimiter.NewMemoryLimiter(100, time.Minute)
 
-// 第三层：长期限制（每小时）
+// Layer 3: Long-term limit (per hour)
 hourlyLimiter := glimiter.NewMemoryLimiter(1000, time.Hour)
 
 s.Group("/api", func(group *ghttp.RouterGroup) {
@@ -160,28 +162,28 @@ s.Group("/api", func(group *ghttp.RouterGroup) {
 })
 ```
 
-### 2. 路由级限速
+### 2. Route-level Rate Limiting
 
-不同的 API 路由使用不同的限速策略：
+Different API routes use different rate limiting strategies:
 
 ```go
 s := g.Server()
 
-// 公开 API：宽松限制
+// Public API: loose restriction
 s.Group("/public", func(group *ghttp.RouterGroup) {
     publicLimiter := glimiter.NewMemoryLimiter(100, time.Minute)
     group.Middleware(glimiter.MiddlewareByIP(publicLimiter))
     group.GET("/info", handler)
 })
 
-// 认证 API：中等限制
+// Authenticated API: moderate restriction
 s.Group("/auth", func(group *ghttp.RouterGroup) {
     authLimiter := glimiter.NewMemoryLimiter(5, time.Minute)
     group.Middleware(glimiter.MiddlewareByIP(authLimiter))
     group.POST("/login", handler)
 })
 
-// 敏感操作：严格限制
+// Sensitive operations: strict restriction
 s.Group("/admin", func(group *ghttp.RouterGroup) {
     adminLimiter := glimiter.NewMemoryLimiter(10, time.Hour)
     group.Middleware(glimiter.MiddlewareByIP(adminLimiter))
@@ -189,13 +191,13 @@ s.Group("/admin", func(group *ghttp.RouterGroup) {
 })
 ```
 
-### 3. 按用户限速
+### 3. Per-user Rate Limiting
 
 ```go
 limiter := glimiter.NewMemoryLimiter(1000, time.Hour)
 
 middleware := glimiter.MiddlewareByUser(limiter, func(r *ghttp.Request) string {
-    // 从上下文中获取用户 ID
+    // Get user ID from context
     user := r.GetCtxVar("user").String()
     return user
 })
@@ -206,15 +208,15 @@ s.Group("/api", func(group *ghttp.RouterGroup) {
 })
 ```
 
-### 4. 直接使用限速器
+### 4. Direct Use of Limiter
 
-不通过中间件，在业务代码中直接使用：
+Using the limiter directly in business code without middleware:
 
 ```go
 limiter := glimiter.NewMemoryLimiter(10, time.Minute)
 
 func ProcessTask(ctx context.Context, taskID string) error {
-    // 检查是否允许处理
+    // Check if processing is allowed
     allowed, err := limiter.Allow(ctx, "task:"+taskID)
     if err != nil {
         return err
@@ -224,63 +226,63 @@ func ProcessTask(ctx context.Context, taskID string) error {
         return errors.New("rate limit exceeded")
     }
     
-    // 执行任务
+    // Execute task
     return doTask(taskID)
 }
 ```
 
-### 5. 等待配额可用
+### 5. Wait for Quota Availability
 
 ```go
 limiter := glimiter.NewMemoryLimiter(5, time.Second)
 
 func SendRequest(ctx context.Context) error {
-    // 阻塞等待，直到配额可用
+    // Block until quota is available
     if err := limiter.Wait(ctx, "api-call"); err != nil {
         return err
     }
     
-    // 发送请求
+    // Send request
     return makeAPICall()
 }
 ```
 
-## 响应头
+## Response Headers
 
-限速中间件会自动设置以下 HTTP 响应头：
+The rate limiting middleware automatically sets the following HTTP response headers:
 
-| 响应头 | 说明 |
-|--------|------|
-| `X-RateLimit-Limit` | 时间窗口内的最大请求数 |
-| `X-RateLimit-Remaining` | 剩余可用请求数 |
-| `X-RateLimit-Reset` | 限速重置时间（Unix 时间戳） |
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests in the time window |
+| `X-RateLimit-Remaining` | Remaining available requests |
+| `X-RateLimit-Reset` | Rate limit reset time (Unix timestamp) |
 
-## 最佳实践
+## Best Practices
 
-### 1. 合理设置时间窗口
+### 1. Reasonable Time Window Settings
 
-- **短时间窗口**（1 分钟内）：适合内存限速器，性能最优
-- **长时间窗口**（1 小时以上）：建议使用 Redis 限速器，支持分布式
+- **Short time windows** (within 1 minute): Suitable for in-memory limiters, optimal performance
+- **Long time windows** (over 1 hour): Recommended to use Redis limiters, support distributed environments
 
-### 2. 使用多层限速
+### 2. Use Multi-layer Rate Limiting
 
-结合不同时间窗口的限速策略，既能防止突发流量，又能限制长期滥用：
+Combine rate limiting strategies for different time windows to prevent both burst traffic and long-term abuse:
 
-- 第一层：秒级限速，防止突发攻击
-- 第二层：分钟级限速，常规使用限制
-- 第三层：小时级限速，长期配额管理
+- Layer 1: Second-level rate limiting to prevent burst attacks
+- Layer 2: Minute-level rate limiting for regular usage restrictions
+- Layer 3: Hour-level rate limiting for long-term quota management
 
-### 3. 区分不同场景
+### 3. Differentiate Between Scenarios
 
-根据 API 的敏感程度和重要性设置不同的限速策略：
+Set different rate limiting strategies according to the sensitivity and importance of APIs:
 
-- **公开 API**：宽松限制，提供良好用户体验
-- **认证 API**：中等限制，防止暴力破解
-- **敏感操作**：严格限制，保护关键功能
+- **Public APIs**: Loose restrictions for good user experience
+- **Authenticated APIs**: Moderate restrictions to prevent brute force attacks
+- **Sensitive operations**: Strict restrictions to protect critical functions
 
-### 4. 提供友好的错误信息
+### 4. Provide Friendly Error Messages
 
-自定义错误处理器，告知用户何时可以重试：
+Customize error handlers to inform users when they can retry:
 
 ```go
 ErrorHandler: func(r *ghttp.Request) {
@@ -293,63 +295,62 @@ ErrorHandler: func(r *ghttp.Request) {
 }
 ```
 
-### 5. 监控和告警
+### 5. Monitoring and Alerting
 
-在生产环境中，建议监控限速器的使用情况：
+In production environments, it is recommended to monitor limiter usage:
 
 ```go
-// 定期检查剩余配额
+// Periodically check remaining quota
 remaining, _ := limiter.GetRemaining(ctx, key)
 if remaining < 10 {
-    // 发送告警
+    // Send alert
     log.Warn("Rate limit nearly exhausted", "key", key, "remaining", remaining)
 }
 ```
 
-## 性能考虑
+## Performance Considerations
 
-### 内存限速器
+### In-Memory Limiter
 
-- **优点**: 极高性能，无网络开销
-- **缺点**: 单机限速，不适合分布式环境
-- **适用**: 单体应用、短时间窗口
+- **Advantages**: Extremely high performance, no network overhead
+- **Disadvantages**: Single-machine limitation, not suitable for distributed environments
+- **Applicable**: Monolithic applications, short time windows
 
-### Redis 限速器
+### Redis Limiter
 
-- **优点**: 支持分布式，数据持久化
-- **缺点**: 有网络延迟开销
-- **适用**: 分布式应用、长时间窗口
+- **Advantages**: Supports distributed environments, data persistence
+- **Disadvantages**: Network latency overhead
+- **Applicable**: Distributed applications, long time windows
 
-## 并发安全
+## Concurrency Safety
 
-### 内存限速器
+### In-Memory Limiter
 
-使用 CAS（Compare-And-Swap）原子操作确保并发安全：
+Uses CAS (Compare-And-Swap) atomic operations to ensure concurrency safety:
 
-### Redis 限速器
+### Redis Limiter
 
-使用 Lua 脚本确保原子操作：
+Uses Lua scripts to ensure atomic operations:
 
+## Frequently Asked Questions
 
-## 常见问题
+### Q: How to use in distributed environments?
 
-### Q: 如何在分布式环境中使用？
+A: Use `RedisLimiter` instead of `MemoryLimiter`, ensuring all service instances share the same Redis.
 
-A: 使用 `RedisLimiter` 替代 `MemoryLimiter`，确保所有服务实例共享同一个 Redis。
+### Q: How to implement dynamic adjustment of rate limiting configuration?
 
-### Q: 如何实现动态调整限速配置？
+A: New `Limiter` instances can be created at runtime and middleware configuration updated.
 
-A: 可以在运行时创建新的 `Limiter` 实例并更新中间件配置。
+### Q: How do time windows work?
 
-### Q: 时间窗口如何工作？
+A:
+- **In-memory limiter**: Uses gcache's automatic expiration feature
+- **Redis limiter**: Uses sliding window algorithm for precise time range control
 
-A: 
-- **内存限速器**: 使用 gcache 的自动过期功能
-- **Redis 限速器**: 使用滑动窗口算法，精确控制时间范围
+### Q: How to avoid the limiter becoming a performance bottleneck?
 
-### Q: 如何避免限速器成为性能瓶颈？
-
-A: 
-1. 短时间窗口使用内存限速器
-2. 合理设置限速配额
-3. 使用多层限速而非单一严格限制
+A:
+1. Use in-memory limiters for short time windows
+2. Reasonably set rate limiting quotas
+3. Use multi-layer rate limiting instead of single strict restrictions
